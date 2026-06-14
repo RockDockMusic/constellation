@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { addStar, foundConstellation } from '@/lib/contract';
 import { isAccepted } from '@/lib/format';
 import { useWallet } from '@/hooks/useWallet';
 import { useContractData } from '@/hooks/useContractData';
 import { useTransaction } from '@/hooks/useTransaction';
 import { ToastProvider, useToasts } from '@/components/Toast';
-import { TopStrip } from '@/components/TopStrip';
+import { Header } from '@/components/Header';
+import { Hero } from '@/components/Hero';
+import { HowItWorks } from '@/components/HowItWorks';
 import { StarMap } from '@/components/StarMap';
 import { ReadingRail } from '@/components/ReadingRail';
 import { ConstellationSwitcher } from '@/components/ConstellationSwitcher';
@@ -33,6 +36,7 @@ function Sky() {
   const [theaterOpen, setTheaterOpen] = useState(false);
   const [judgingText, setJudgingText] = useState('');
 
+  const liveRef = useRef<HTMLElement | null>(null);
   const pending = useRef<Pending>(null);
   const toastId = useRef<string | null>(null);
   const lastRetry = useRef<(() => void) | null>(null);
@@ -48,6 +52,10 @@ function Sky() {
     () => data.constellations.reduce((m, c) => Math.max(m, c.best_momentum), 0),
     [data.constellations],
   );
+
+  const scrollToSky = useCallback(() => {
+    liveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const cast = useCallback(
     (text: string) => {
@@ -160,66 +168,109 @@ function Sky() {
   const showMap = !data.loading && !data.error && data.selected;
 
   return (
-    <div className="relative min-h-screen">
-      <TopStrip wallet={wallet} stats={data.stats} bestMomentum={bestMomentum} />
+    <div className="relative">
+      <Header wallet={wallet} />
 
-      <main className="relative z-10 mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6">
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[330px_1fr]">
-          <div className="flex flex-col gap-5">
-            <ConstellationSwitcher
-              constellations={data.constellations}
-              selectedId={data.selectedId}
-              onSelect={onSelectConstellation}
-              onNew={() => setNewOpen(true)}
-            />
-            {showMap && (
-              <ContributePanel
-                selected={data.selected}
-                hasWallet={!!wallet.address}
-                busy={busy}
-                onCast={cast}
-                onConnect={wallet.connect}
+      <main className="relative z-10">
+        <Hero
+          stats={data.stats}
+          bestMomentum={bestMomentum}
+          online={!wallet.address || wallet.onChain}
+          onEnter={scrollToSky}
+        />
+
+        <HowItWorks />
+
+        <section
+          id="sky"
+          ref={liveRef}
+          className="relative mx-auto w-full max-w-[1320px] scroll-mt-20 px-4 py-16 sm:px-6 sm:py-24"
+          aria-label="The living sky"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.6 }}
+            className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+          >
+            <div className="max-w-2xl">
+              <p className="text-[12px] uppercase tracking-[0.24em]" style={{ color: 'var(--muted)' }}>
+                The living sky
+              </p>
+              <h2 className="mt-3 text-[30px] leading-tight sm:text-[40px]" style={{ color: 'var(--ink)' }}>
+                Trace a constellation, then add to it
+              </h2>
+              <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+                Pick a constellation to read its chain on the star map. Select any star for its full
+                reading, then cast the next line onto the tail.
+              </p>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-[330px_1fr]"
+          >
+            <div className="flex flex-col gap-5">
+              <ConstellationSwitcher
+                constellations={data.constellations}
+                selectedId={data.selectedId}
+                onSelect={onSelectConstellation}
+                onNew={() => setNewOpen(true)}
               />
-            )}
-          </div>
-
-          <div className="relative min-h-[440px]">
-            {data.loading && <MapSkeleton slow={data.slow} />}
-
-            {data.error && !data.loading && (
-              <div className="relative overflow-hidden rounded-2xl">
-                <Starfield />
-                <ErrorState message={data.error} onRetry={() => void data.refresh()} />
-              </div>
-            )}
-
-            {showEmpty && (
-              <div className="panel relative overflow-hidden">
-                <Starfield />
-                <div className="relative z-10">
-                  <EmptyState onChart={() => setNewOpen(true)} />
-                </div>
-              </div>
-            )}
-
-            {showMap && data.selected && (
-              <>
-                <StarMap
-                  stars={data.stars}
-                  selectedStarN={selectedStarN}
-                  onSelectStar={setSelectedStarN}
-                  theme={data.selected.theme}
-                  status={data.selected.status}
+              {showMap && (
+                <ContributePanel
+                  selected={data.selected}
+                  hasWallet={!!wallet.address}
+                  busy={busy}
+                  onCast={cast}
+                  onConnect={wallet.connect}
                 />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3 sm:inset-y-0 sm:left-auto sm:right-0 sm:flex sm:w-[340px] sm:items-stretch">
-                  <div className="pointer-events-auto w-full">
-                    <ReadingRail star={selectedStar} onClose={() => setSelectedStarN(null)} />
+              )}
+            </div>
+
+            <div className="relative min-h-[460px]">
+              {data.loading && <MapSkeleton slow={data.slow} />}
+
+              {data.error && !data.loading && (
+                <div className="relative overflow-hidden rounded-2xl">
+                  <Starfield />
+                  <ErrorState message={data.error} onRetry={() => void data.refresh()} />
+                </div>
+              )}
+
+              {showEmpty && (
+                <div className="panel relative overflow-hidden">
+                  <Starfield />
+                  <div className="relative z-10">
+                    <EmptyState onChart={() => setNewOpen(true)} />
                   </div>
                 </div>
-              </>
-            )}
-          </div>
-        </div>
+              )}
+
+              {showMap && data.selected && (
+                <>
+                  <StarMap
+                    stars={data.stars}
+                    selectedStarN={selectedStarN}
+                    onSelectStar={setSelectedStarN}
+                    theme={data.selected.theme}
+                    status={data.selected.status}
+                  />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3 sm:inset-y-0 sm:left-auto sm:right-0 sm:flex sm:w-[340px] sm:items-stretch">
+                    <div className="pointer-events-auto w-full">
+                      <ReadingRail star={selectedStar} onClose={() => setSelectedStarN(null)} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </motion.div>
+        </section>
       </main>
 
       <Footer />
